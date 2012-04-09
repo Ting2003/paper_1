@@ -1,0 +1,247 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[cmex10]{amsmath}
+\usepackage{enumerate}
+\usepackage{verbatim}
+\usepackage{graphicx, subfigure, rotating}
+\usepackage{cite}
+\usepackage{multirow}
+\def\thesection{\arabic{section}}
+\graphicspath{{./figures/}}
+
+\begin{document}
+\title{Efficient Parallel Transient Power Grid Analysis}
+\maketitle
+
+\begin{abstract}
+An effective parallel method for transient power grid analysis is proposed in this paper. Based on direct solver, the conductance matrix 
+is decomposed only twice, and is repeated utilized for different time steps. The solver is developed with multi-thread technique.
+Each thread handles one subcircuit in power grid. Within each grid, methods such as sparse vector technique, solving mapping technique
+are utilized to speed up the sequential solving process. Experimental results on 6 industrial benchmarks show that the proposed method
+is accurate and fast.
+\end{abstract}
+
+\section{Introduction}
+It is well known that power grids are usually large in size, which usually contains millions of nodes. This fact has made the simulation 
+process more and more expensive. More and more time and memory are required to get the accurate result. There are mainly two types of
+power grid analysis: DC analysis and transient analysis. DC analysis assumes the current is static while in transient analysis, the 
+current is a varying vector with time. DC analysis is a special case of transient analysis, because it only contains one time step.
+
+As it may be inprohibitely expensive to simulate power grids, it is highly desirable to develop an efficient solver which could overcome or
+allievate the situation. Considering the advanced ability in computation, developing parallel solver is a potencial candidate. There are 
+already
+works talking about parallel DC solver, including domain decomposition\cite{PETSC_website, kaisun, voronov}, multigrid\cite{Zhuofeng,Kozhaya}, parallel LU\cite{Super_LU_website} %cite myself paper%
+and so on. Although speed up 
+is achieved for DC analysis, these methods may slow the transient analysis process. This is because the bottleneck factors of DC and 
+transient analysis are different. In DC analysis, during the solving process, over 95\% of solving time is consumed for factorization of 
+conductance 
+matrix. The forward backward solving process cost little time. An effective way to overcome this bottleneck is to build up local matrix
+instead of the global one. By doing this, the dimension of matrix is smaller, and the time for factorization is much less. To get the 
+accurate result, many iterations are needed before converge. As a result, the time for forward and backward solving may be longer than 
+previous case. However, this extra cost is still worthwhile because much more time is saved for matrix factorization. In transient 
+analysis, only limited factorization is required, which is usually one or two times, while a lot of time steps are required to be solved, 
+which is uaually in thousands. As a result, the bottleneck factor of the simulation has switched to forward and backward solving. If the same strategy for DC is utilized for transient analysis, in each time step, a lot of iterations are needed to get the accurate result. The 
+iteration time costed per step is larger than a single forward and backward solve. This is because in each iteration, there is a forward 
+and backward solving process. Though there is a time saving for matrix factorization, the total extra time costed during the solving 
+process will be larger than the time saved previously. As a result, the methods for DC speedup is not suitable for transient analysis.
+For multigrid method in\cite{Zhuofeng,Kozhaya}, the fine grid results are iteratively corrected by coarse ones. Matrix is built on each level of grid and 
+smoothed to some extent. Again, the iterative process is performed in each iteration. First, error may exist with multigrid method, 
+because itself is a approximation process. The worse thing is that the error will accumulate as time step goes by, and the error will be 
+intractable. Besides, because in each time step, there is still an iterative solving process, the total time may still be slower than 
+basic direct solver.
+
+There are also some other works talking about parallization for transient analysis of linear systems, for example, \cite{Alvarado, Scala, 
+Chai}. However, there are some limitations of these methods, which make them not suitable for power grid simulation. For example, in 
+\cite{Alvarado}, $2^T$ time steps can be solved in $T$ steps, which requires $T/2$ processors. However, this method requires integrating 
+the matrix of $2^T$ into a global matrix, and decompose quarter the size of the global matrix. The new matrix that need to factorize is
+$2^T$ times larger than original one, which will cost a lot more time for decomposition. This characteristic limits the size that this
+method to be very small. As a result, considering the size of power grid, this method is not suitable. \cite{Chai} parallelize an 
+iterative methods. Parallel is performed both for different time steps and iterations within one time step. The parallel effect is similar
+to pipeline technique. Iterations are overlapped together to reduce the simulation time. The amount saving of time depends on iteration 
+numbers. If the processor resource is sufficient, for $T$ time steps where each time step needs $N$ iterations to converge, $T+N$ iteration
+time is cost. The total time saving is $T\times N - (T+N)$. The larger $N$, the more time saving. However, compared to direct
+solver for transient analysis, the larger $N$ means the iteration method itself is slower than the direct solver. Besides, with this method, the maximum speed up is $\frac{T\times N}{(T+N)} \approx N$. This happens for small $N$. As a result, limited amount speed up over the sequential version may be arrived, while the iterative sequential solver is slower than the direct solver. 
+At the same time, this method requires a large amount of data communication in each iteration, because the solution of the whole grid 
+nodes need to be updated. Considering the speed up that can gain is small, and the cost of communication, this method is also not suitable
+for transient power grid analysis. 
+
+As a result, new method needs to be developed to speed up the transient analysis. This paper proposes an efficient parallel solver for 
+power grid transient analysis. For the reason mentioned above, the solver is direct solver based. After factorization of global conductance
+matrix, one forward and backward substitution is performed in each time step. Several methods are developed to speedup the sequential code, for example, sparse vector technique and solution-mapping technique. Multi threads are utilized to work on independent pieces of power 
+grids, which effectively introduces speedup. The main contributions are as follows:
+  \begin{enumerate}[1)]
+  \item Trapezoidal model of capacitance and inductance is utilizd to make the conductance matrix symmetric, thus saves both factorization
+	time and storage space.
+  \item Techniques such as sparse vector and solution-mapping are developed to accelerate the sequential simulation.
+  \item Multiple threads are utilized to work on independent components of power grids, which is very effective in speed up the 
+	simulation.
+  \end{enumerate} 
+
+The rest of this paper is organized as follows. Section 2 discusses models of transient analysis. Section 3 presents the proposed method. 
+Experimental results are illustrated in section 4. Conclusion is given in section 5.
+ 
+\section{Component Model for Transient analysis}
+In power grid model for transient, there are two new components: capacitance and inductance. There are three equivalent linear models for
+these two devices: Forward Euler (FE), Backward Euler (BE), and Trapezoidal model (TR). The original matrix for DC analysis is symmetrical potitive definite (SPD), thus cholesky decomposition method can be utilized to do the factorization. Cholesky decomposition is not only
+on average 2 times faster than LU decompoisition method, but also saves about half the memory for storing the matrix. As a result, it is
+highly preferrable to make the conductance SPD, so that cholesky decomoposition method can be utilized. In transient 
+analysis, components as capacitance and inducatance are considered in conductance matrix. Whether the conductance matrix is SPD depends on
+the models used for these two components. 
+\begin{figure*}[htbp]
+  \centering
+  \includegraphics[width = 0.8\textwidth]{TR_model_new.pdf}
+  \caption{Companion models for capacitor and inductor.}
+  \label{TR_model}
+\end{figure*}
+
+Figure~\ref{TR_model} shows the two components and their three models. There are two representations of BE and TR: Norton and Trevin form, as shown 
+in Figure~\ref{TR_model}. In FE model or Thevenion form of BE and TR models, an equivalent voltage source is introduced for at least one component. 
+With any of these models, the conductance matrix is not SPD. This can be proved as follows: 
+
+Suppose there is a voltage source between node $i$ and node $j$. The matrix before stamping the voltage source has dimension of $nxn$. 
+After stamping this voltage source, the new matrix is shown as follows:
+\begin{figure}[htbp]
+ \centering
+ \includegraphics[width=0.3\textwidth]{SPD_matrix_new.pdf}
+ \caption{Conductance matrix after stamping companion model}
+ \label{SPD_matrix}
+\end{figure} 
+%use equations to prove that the BE or FE modeled matrix is not SPD%
+
+On the other hand, using the Norton form of TR or BE companion models for both capacitors and inductances will not introduce any 
+voltage source. The introduced components are resistors and currents, which will not effect the SPD characteristic of conductance matrix. 
+ 
+Besides, FE and BE model will change the effective number of nodes in power grid. As a result, the matrix sizes for DC and transient analysis are different. All the nodes have new indexes, and not any information of old matrix can be reused to form the new matrix. In fact, as 
+the amount of capacitance and inductance only occupys a small ratio of the grid, and most of the nets
+information forming the matrix are identical between DC analysis and transient analysis, it is highly preferrable to get the new matrix by
+only modifying capacitance and inductance nets. By using Norton form of TR or BE companion model of inductance and capacitance, no extra 
+node 
+will be introduced into the grid. All the nodes keeps their indecies unchanged. As a result, the new matrix can be gained by only stamping
+the capacitance and inductance equivalent components and doing a little modification to the old items of the original matrix. With this
+model, the setting up work is much more easier and time saving, which is especially true for large size of power grids. Considering that 
+Trapezoidal integratio is in general more accurate than either FE or BE\cite{ECE552}, TR model is considered in this paper.
+
+Based on the above consideration, TR companion models of capacitors and inductances in Norton form are utilized in this paper. The 
+resulting matrix is SPD, and will be decomposed with cholesky method.
+
+\section{Methodology}
+  \subsection{Sparse Vector}
+   %first show the example and cite%
+    There are two stages in solving a linear system: matrix decompisition and forward (FE) and backward (BE) substitution stages. In matrix 
+decomposition,
+, the sparsity of matrix can greatly help reducing computation intensity. In the same way, the sparsity of vectors can also help reducing
+the computation intensity. \cite{Tinney} illustrates the theory of sparse vector methods. Suppose we have a linear system with 20 nodes.
+The conductance matrix has already been decomposed, which is 
+\begin{equation}
+	A=LL'\label{eq3.1}
+\end{equation}
+Forward and backward substitution are required to obtain the final solution. The equations for these two operations are as follows:
+\begin{align}
+	LY &=b  &(FE)\label{eq3.2}\\
+	L'X &= Y&(BE)\label{eq3.3}
+\end{align}
+
+  %figure 1: elimination tree of A%
+Figure 1.(a) Shows the $L$ of the decomposed matrix $A$ and the corresponding elimination tree. Assuming that only $y_{12}, y_{14}$ is 
+non-zero, and only $x_{10},x_{17}$ is required for finding solution. Then, the items in $Y$ and $X$ that need to be computed can be 
+presented along the following path, which represents their order of computation.
+\begin{align}
+&\{12, 15, 14, 17, 18, 19, 20\} &(FE)\label{eq3.4}\\
+&\{20, 19, 18, 17, 13, 10\}&(BE)\label{eq3.5}
+\end{align}
+In this paper, we define the above two paths as ``forward path" and ``backward path". By utilizing the sparse characteristic of vectors,
+only 6 or 7 items are needed to compute instead of 20. It can be seen that by utilizing the sparcity characteristic of vectors, a lot of
+savings in FE and BE can be obtained. The amount of savings of computation depends on the number of nodes in the paths, which depends on 
+the matrix structure. 
+ 
+In transient analysis, it can be seen that as long as the right parameter values of capacitor and inductance are gained, it is 
+sufficient to 
+perform the computation of next time step. As a result, the voltage values of neighboring nodes of capacitor and inductance should be 
+known. Besides, there are also tens of observation nodes, whose voltage values need to be known at each time step. The voltage values of
+these two part of nodes are all information we need to get at each time step. Considering that the
+total ratio that the above two parts of nodes occupyies is only a small amount of the total number of nodes in power grid, the equivalent
+vector $X$ is very sparse. On the other hand, $b$ depends on the number of current sources in the grid, which is very small a ratio 
+compared to the total number of nodes. $b$ is very sparse as well. With this sparse characteristic in vector $b$ and $X$, we can build the
+forward and backward paths and save part of the effort in computation. This effort is worthwhile for transient analysis, because by 
+reusing the paths, saving in computation is accumulated as time step goes by.
+
+The challenging work is to build the forward and backward paths. \cite{Tinney} provides a path building method, where the first path is 
+obtained on the first step. Then, the next path segments will be inserted into the original path as a whole unit. The inserting point is 
+before the cross point of new path segment and original one. The resulting path is shown in equation \eqref{eq3.4} and \eqref{eq3.5}. It
+can be seen that the resulting index of rows/columns in the path is not mononically ascending or descending. This will cause trouble in
+later substitution stage, because it is not possible to finish traversing the path with a single for loop. In order to reduce the 
+complexity, the indexes in the path have to be mononically ascending in FF and mononically descending in BF. Another more serious problem
+is that this method can not detect the case where a node does not have any decedent in the elimination tree, such as column $5$ in figure 
+1. Because diagonal element does not have any decedent element, no insertion point can be find with the above method. As a result, the 
+path is showing incomplete information, and will lead to wrong solution. 
+
+In order to overcome the above limitations, a new method is proposed in this paper. It is illustrated in Figure 2.
+%Figure 2: showing the algorithms of path building method%
+After building the first path, the next segment start from the node with minimum index and will stop under two cases: 
+\begin{enumerate}[1)]
+\item Current node has a descedent and the descedent node is already in the formed path; 
+\item Current node has no descedent.
+\end{enumerate} 
+By considering the second case, the node that has no descedent is included to form the path. We build a list to record all the nodes in 
+the segments. To make the later substitution stage being finished in a for loop, we sorted the nodes in the list. The sorted list are then
+inserted into the original path obtained from first step. Since the nodes in the list are in asceding order, so does the original path, 
+the searching and insertion will start from the position that the last node is inserted, instead of the head of the path. The cost for
+insertion is $O(n)$, where $n$ is the number of nodes in the matrix. Notice that we will only sort an array with length of the list, 
+instead of all the nodes in the matrix. If the first path is very long, we only need to sort a short array, which reduces a lot of effort.
+%In the experiment result, need a table to show the ratio saved with this technique, and the speed for building the paths% 
+
+ \subsection{Solution Mapping}
+In order to reduce fill-ins, reordering is usually taken in matrix decomposition process. The ordering in decomposed 
+matrix and the original one is different. In order to get the right result, corresponding reordering must be performed to the right hand 
+side vector. Regular solving process is as follows:
+\begin{enumerate}[1)]
+\item Reordering the right hand side vector in the same way of decomposing matrix.
+\item Perform forward and backward substitution to get the reordered solution.
+\item Reordering the solution vector back in the inverse way as that of the right hand side.
+\end{enumerate}
+As we can see, in each time step, 2 reordering operations required to get the right solution. If we utilize the regular solving process in each
+time step, for transient analysis of large power grid, the reordering process may cost a lot of time. It is highly perferrable to 
+eliminate the reordering operation. It is possible to realize this idea case: after factorizing the conductance matrix, the mapping 
+relationship between the original and new order of each node is recorded. For each node on power grid, the original index is renewed
+into the new one. Then, the right hand side is restamped based on the new ordering. Through these operations, the right hand side vector is
+in the same ordering with the decomposed matrix. The equivalent linear system for solving stage is as follows:
+\begin{equation}
+A'x = b'
+\end{equation}
+where $A'=LL'$ is the decomposed matrix without reordering, and $b'$ is the right hand side without reordering.
+
+As a result, the 2 reordering operations are not needed. Only the FE and BE operations are executed for all the time steps.
+%In Experiment result, need a table to show the time savings with the reordering technique% 
+  \subsection{Memory Supernode Solving}
+%find and cite some papers about supernode technique, a brief introduction of supernode solving%
+%need to talk about regular supernode solving process: judgement is required to be performed in each time step%
+In this paper, a modified supernode technique named ``Memory Supernode Solving" is proposed for efficient transient simulation. After 
+factorizing the conductance matrix, the number of columns contained in each supernode is gained by judging the characteristic among 
+neighboring columns. This information is stored in an array. Then, in each time step, corresponding functions for different type of 
+supernode are directly called by getting data from the stored array. No complex judgement is required. This is effective for transient
+analysis, in which multi step computation is required.  
+%In experiment result, need a table to show the time savings with Memorized supernode solving technique%
+  \subsection{Optimized Current Restamping}
+In transient analysis, current varies among different time steps. Because of this change, vector $b$ in equation $AX=b$ needs to be 
+modified at different time steps. It should be noticed that part of the currents stay static for a period. We do not need to modify
+the items that correspond to these current sources. Instead, in each time step, we will locate those current sources whose value are
+different from last step, and only modify the corresponding items in the right hand side. 
+  \subsection{Multiple threads}
+There are usually several sub circuits in power grids: VDD, GND and so on. These sub circuits are totally disjoint and can be solved
+in parallel. In this paper, multiple threads are used to parallelize the simulation. One thread handles one sub circuit. The number of
+speed up is almost identical to the number of sub circuits in the power grids.
+%talking about dynamic schedule, and why further speed up can not gained with this strategy, or why it is the maximum speed up gained% 
+\section{Experiments}
+We performed the proposed method in C++. Six industrical benchmarks from \cite{IBM} are used to test its performance. The
+program is run on a shared memory system with 64G RAM and 32 threads. The CPU frequency of the system is 1.33GHz. 
+
+%List the tables for experimental results, including one of the slow cpu time, fast CPU time and Parallel time, %
+\section{Conclusion}
+In this paper, we propose a parallel method for power grid transient analysis. Trapezoidal models of capacitance and inductance are 
+utilized to make a SPD conductance matrix. Techniques such as sparse vector, position mapping, memory supernode, optimized current 
+restamping are developed to accelerate forward and backward substitution process. Multiple threads are utilized to parallelize the
+simulation process. Six industrical benchmarks are used to test the performance of the solver. This solver won the first prize of the
+11 teams registered in TAU contest.
+\bibliographystyle{./IEEEtran}
+\bibliography{refs}
+
+\end{document}
