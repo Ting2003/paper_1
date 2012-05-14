@@ -1,0 +1,55 @@
+\section{Introduction}
+Due to the development of CMOS technology, transistor size becomes more and more smaller. The higher density of transistors in the integrated chip requires denser power supply network (power grid) to supply more power. As a result, power grid becomes larger and larger in size, which usually contains millions of nodes. On the other hand, due to the metal interconnections and inductances in the network, there is a voltage drop across the network. This voltage drop is called ``IR-drop". Actual supply voltages of transistors may be less than the global supply voltage of power grid. Affected by the parameters of the network such as inductors and interconnections, the ``IR-drop'' may cause large delay or even malfunction of the circuit. As a result, after designing the power supply network for the circuit, it is important to verify the design by performing IR-drop analysis. There are mainly two types of
+IR-drop analysis in power grid: DC analysis and transient analysis. DC analysis assumes the grid is composed with only resistors and the current is static. Transient analysis models the power grid as a network with resistors, capacitances and inductances. In transient analysis, current is a varying vector with time. Because transient analysis simulates the power grid with a more accurate model and considering the time as a factor for IR-drop analysis, transient analysis has more accurate results than DC analysis, but it also consumes much longer simulation time. Combined the fact that power grid is in large size, the cost of runtime and memory for transient analysis of power grid maybe too expensive to afford. 
+
+As it may be prohibitively expensive to performing transient IR-drop analysis of power grid, it is highly desirable to develop an efficient solver to overcome or alleviate the situation. Considering the advanced ability in computation, developing parallel solver is a potential candidate. There are 
+already
+works talking about parallel DC solver, including domain decomposition\cite{PETSC_website, kaisun, voronov}, multigrid\cite{Zhuofeng,Kozhaya}, parallel LU\cite{Super_LU_website} %cite myself paper%
+and so on. Although speed up 
+is achieved for DC analysis, these methods may slow the transient analysis process. This is because the bottleneck factors of DC and 
+transient analysis are different. In DC analysis, during the solving process, over 95\% of solving time is consumed for factorization of 
+conductance 
+matrix. The forward backward solving process cost little time. An effective way to overcome this bottleneck is to build up local matrix
+instead of the global one. By doing this, the dimension of matrix is smaller, and the time for factorization is much less. To get the 
+accurate result, many iterations are needed before converge. As a result, the time for forward and backward solving may be longer than 
+previous case. However, this extra cost is still worthwhile because much more time is saved for matrix factorization. In transient 
+analysis, only limited factorization is required, which is usually one or two times, while a lot of time steps are required to be solved, 
+which is usually in thousands. As a result, the bottleneck factor of the simulation has switched to forward and backward solving. If the same strategy for DC is utilized for transient analysis, in each time step, a lot of iterations are needed to get the accurate result. The 
+iteration time costed per step is larger than a single forward and backward solve. This is because in each iteration, there is a forward 
+and backward solving process. Though there is a time saving for matrix factorization, the total extra time costed during the solving 
+process will be larger than the time saved previously. As a result, the methods for DC speedup is not suitable for transient analysis.
+For multigrid method in\cite{Zhuofeng,Kozhaya}, the fine grid results are iteratively corrected by coarse ones. Matrix is built on each level of grid and 
+smoothed to some extent. Again, the iterative process is performed in each iteration. First, error may exist with multigrid method, 
+because itself is a approximation process. The worse thing is that the error will accumulate as time step goes by, and the error will be 
+intractable. Besides, because in each time step, there is still an iterative solving process, the total time may still be slower than 
+basic direct solver.
+
+There are also some other works talking about parallelization for transient analysis of linear systems, for example, \cite{Alvarado, Scala, 
+Chai}. However, there are some limitations of these methods, which make them not suitable for power grid simulation. For example, in 
+\cite{Alvarado}, $2^T$ time steps can be solved in $T$ steps, which requires $T/2$ processors. However, this method requires integrating 
+the matrix of $2^T$ into a global matrix, and decompose quarter the size of the global matrix. The new matrix that need to factorize is
+$2^T$ times larger than original one, which will cost a lot more time for decomposition. This characteristic limits the size that this
+method to be very small. As a result, considering the size of power grid, this method is not suitable. \cite{Chai} parallelize an 
+iterative methods. Parallel is performed both for different time steps and iterations within one time step. The parallel effect is similar
+to pipeline technique. Iterations are overlapped together to reduce the simulation time. The amount saving of time depends on iteration 
+numbers. If the processor resource is sufficient, for $T$ time steps where each time step needs $N$ iterations to converge, $T+N$ iteration
+time is cost. The total time saving is $T\times N - (T+N)$. The larger $N$, the more time saving. However, compared to direct
+solver for transient analysis, the larger $N$ means the iteration method itself is slower than the direct solver. Besides, with this method, the maximum speed up is $\frac{T\times N}{(T+N)} \approx N$. This happens for small $N$. As a result, limited amount speed up over the sequential version may be arrived, while the iterative sequential solver is slower than the direct solver. 
+At the same time, this method requires a large amount of data communication in each iteration, because the solution of the whole grid 
+nodes need to be updated. Considering the speed up that can gain is small, and the cost of communication, this method is also not suitable
+for transient power grid analysis. 
+
+As a result, new method needs to be developed to speed up the transient analysis. This paper proposes an efficient parallel solver for 
+power grid transient analysis. For the reason mentioned above, the solver is direct solver based. After factorization of global conductance
+matrix, one forward and backward substitution is performed in each time step. Several methods are developed to speedup the sequential code, for example, sparse vector technique and solution-mapping technique. Multi threads are utilized to work on independent pieces of power 
+grids, which effectively introduces speedup. The main contributions are as follows:
+  \begin{enumerate}[1)]
+  \item Trapezoidal model of capacitance and inductance is utilized to make the conductance matrix symmetric, thus saves both factorization
+	time and storage space.
+  \item Techniques such as sparse vector and solution-mapping are developed to accelerate the sequential simulation.
+  \item Multiple threads are utilized to work on independent components of power grids, which is very effective in speed up the 
+	simulation.
+  \end{enumerate} 
+
+The rest of this paper is organized as follows. Section 2 discusses models of transient analysis. Section 3 presents the proposed method. 
+Experimental results are illustrated in section 4. Conclusion is given in section 5.

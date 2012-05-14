@@ -1,0 +1,107 @@
+\section{Methodology}
+  \subsection{Sparse Vector}
+   %first show the example and cite%
+    There are two stages in solving a linear system: matrix decompisition and forward (FE) and backward (BE) substitution stages. In matrix 
+decomposition,
+, the sparsity of matrix can greatly help reducing computation intensity. In the same way, the sparsity of vectors can also help reducing
+the computation intensity. \cite{Tinney} illustrates the theory of sparse vector methods. Suppose we have a linear system with 20 nodes.
+The conductance matrix has already been decomposed, which is 
+\begin{equation}
+	A=LL'\label{eq3.1}
+\end{equation}
+Forward and backward substitution are required to obtain the final solution. The equations for these two operations are as follows:
+\begin{align}
+	LY &=b  &(FE)\label{eq3.2}\\
+	L'X &= Y&(BE)\label{eq3.3}
+\end{align}
+
+  %figure 1: elimination tree of A%
+Figure 1.(a) Shows the $L$ of the decomposed matrix $A$ and the corresponding elimination tree. Assuming that only $y_{12}, y_{14}$ is 
+non-zero, and only $x_{10},x_{17}$ is required for finding solution. Then, the items in $Y$ and $X$ that need to be computed can be 
+presented along the following path, which represents their order of computation.
+\begin{align}
+&\{12, 15, 14, 17, 18, 19, 20\} &(FE)\label{eq3.4}\\
+&\{20, 19, 18, 17, 13, 10\}&(BE)\label{eq3.5}
+\end{align}
+In this paper, we define the above two paths as ``forward path" and ``backward path". By utilizing the sparse characteristic of vectors,
+only 6 or 7 items are needed to compute instead of 20. It can be seen that by utilizing the sparcity characteristic of vectors, a lot of
+savings in FE and BE can be obtained. The amount of savings of computation depends on the number of nodes in the paths, which depends on 
+the matrix structure. 
+ 
+In transient analysis, it can be seen that as long as the right parameter values of capacitor and inductance are gained, it is 
+sufficient to 
+perform the computation of next time step. As a result, the voltage values of neighboring nodes of capacitor and inductance should be 
+known. Besides, there are also tens of observation nodes, whose voltage values need to be known at each time step. The voltage values of
+these two part of nodes are all information we need to get at each time step. Considering that the
+total ratio that the above two parts of nodes occupyies is only a small amount of the total number of nodes in power grid, the equivalent
+vector $X$ is very sparse. On the other hand, $b$ depends on the number of current sources in the grid, which is very small a ratio 
+compared to the total number of nodes. $b$ is very sparse as well. With this sparse characteristic in vector $b$ and $X$, we can build the
+forward and backward paths and save part of the effort in computation. This effort is worthwhile for transient analysis, because by 
+reusing the paths, saving in computation is accumulated as time step goes by.
+
+The challenging work is to build the forward and backward paths. \cite{Tinney} provides a path building method, where the first path is 
+obtained on the first step. Then, the next path segments will be inserted into the original path as a whole unit. The inserting point is 
+before the cross point of new path segment and original one. The resulting path is shown in equation \eqref{eq3.4} and \eqref{eq3.5}. It
+can be seen that the resulting index of rows/columns in the path is not mononically ascending or descending. This will cause trouble in
+later substitution stage, because it is not possible to finish traversing the path with a single for loop. In order to reduce the 
+complexity, the indexes in the path have to be mononically ascending in FF and mononically descending in BF. Another more serious problem
+is that this method can not detect the case where a node does not have any decedent in the elimination tree, such as column $5$ in figure 
+1. Because diagonal element does not have any decedent element, no insertion point can be find with the above method. As a result, the 
+path is showing incomplete information, and will lead to wrong solution. 
+
+In order to overcome the above limitations, a new method is proposed in this paper. It is illustrated in Figure 2.
+%Figure 2: showing the algorithms of path building method%
+After building the first path, the next segment start from the node with minimum index and will stop under two cases: 
+\begin{enumerate}[1)]
+\item Current node has a descedent and the descedent node is already in the formed path; 
+\item Current node has no descedent.
+\end{enumerate} 
+By considering the second case, the node that has no descedent is included to form the path. We build a list to record all the nodes in 
+the segments. To make the later substitution stage being finished in a for loop, we sorted the nodes in the list. The sorted list are then
+inserted into the original path obtained from first step. Since the nodes in the list are in asceding order, so does the original path, 
+the searching and insertion will start from the position that the last node is inserted, instead of the head of the path. The cost for
+insertion is $O(n)$, where $n$ is the number of nodes in the matrix. Notice that we will only sort an array with length of the list, 
+instead of all the nodes in the matrix. If the first path is very long, we only need to sort a short array, which reduces a lot of effort.
+%In the experiment result, need a table to show the ratio saved with this technique, and the speed for building the paths% 
+
+ \subsection{Solution Mapping}
+In order to reduce fill-ins, reordering is usually taken in matrix decomposition process. The ordering in decomposed 
+matrix and the original one is different. In order to get the right result, corresponding reordering must be performed to the right hand 
+side vector. Regular solving process is as follows:
+\begin{enumerate}[1)]
+\item Reordering the right hand side vector in the same way of decomposing matrix.
+\item Perform forward and backward substitution to get the reordered solution.
+\item Reordering the solution vector back in the inverse way as that of the right hand side.
+\end{enumerate}
+As we can see, in each time step, 2 reordering operations required to get the right solution. If we utilize the regular solving process in each
+time step, for transient analysis of large power grid, the reordering process may cost a lot of time. It is highly perferable to 
+eliminate the reordering operation. It is possible to realize this idea case: after factorizing the conductance matrix, the mapping 
+relationship between the original and new order of each node is recorded. For each node on power grid, the original index is renewed
+into the new one. Then, the right hand side is restamped based on the new ordering. Through these operations, the right hand side vector is
+in the same ordering with the decomposed matrix. The equivalent linear system for solving stage is as follows:
+\begin{equation}
+A'x = b'
+\end{equation}
+where $A'=LL'$ is the decomposed matrix without reordering, and $b'$ is the right hand side without reordering.
+
+As a result, the 2 reordering operations are not needed. Only the FE and BE operations are executed for all the time steps.
+%In Experiment result, need a table to show the time savings with the reordering technique% 
+  \subsection{Memory Supernode Solving}
+%find and cite some papers about supernode technique, a brief introduction of supernode solving%
+%need to talk about regular supernode solving process: judgement is required to be performed in each time step%
+In this paper, a modified supernode technique named ``Memory Supernode Solving" is proposed for efficient transient simulation. After 
+factorizing the conductance matrix, the number of columns contained in each supernode is gained by judging the characteristic among 
+neighboring columns. This information is stored in an array. Then, in each time step, corresponding functions for different type of 
+supernode are directly called by getting data from the stored array. No complex judgement is required. This is effective for transient
+analysis, in which multi step computation is required.  
+%In experiment result, need a table to show the time savings with Memorized supernode solving technique%
+  \subsection{Optimized Current Restamping}
+In transient analysis, current varies among different time steps. Because of this change, vector $b$ in equation $AX=b$ needs to be 
+modified at different time steps. It should be noticed that part of the currents stay static for a period. We do not need to modify
+the items that correspond to these current sources. Instead, in each time step, we will locate those current sources whose value are
+different from last step, and only modify the corresponding items in the right hand side. 
+  \subsection{Multiple threads}
+There are usually several sub circuits in power grids: VDD, GND and so on. These sub circuits are totally disjoint and can be solved
+in parallel. In this paper, multiple threads are used to parallelize the simulation. One thread handles one sub circuit. The number of
+speed up is almost identical to the number of sub circuits in the power grids.
+%talking about dynamic schedule, and why further speed up can not gained with this stra

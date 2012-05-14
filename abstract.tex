@@ -1,0 +1,6 @@
+\begin{abstract}
+Transient IR drop analysis of large size power grid is still a challenging task, due to the expensive runtime and memory consumption. In this paper, we propose PGT\_SOLVER - an effective parallel solver for transient IR drop analysis of power grid. It is based on direct solver. The conductance matrix is decomposed only twice, and is repeatedly utilized to solve different 
+time steps. It is developed with multi-thread technique. Each thread simulates one subcircuit in power grid. Sparse vector technique is utilized to avoid solving voltage values of all nodes of power grid. Smart mapping technique is proposed to locate the corresponding node index before and after reordering introduced in matrix decomposition process. Moreover, supernode technique is also utilized to speed up the solving process. This software won the first prize of TAU\_2012. The experimental results on several industrial benchmarks show that the proposed method is very fast in simulation without losing any accuracy.
+\end{abstract}
+
+
