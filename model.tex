@@ -1,10 +1,6 @@
-\section{Component Model for Transient analysis}
-In power grid model for transient, there are two new components: capacitance and inductance. There are three equivalent linear models for
-these two devices: Forward Euler (FE), Backward Euler (BE), and Trapezoidal model (TR). The original matrix for DC analysis is symmetrical potitive definite (SPD), thus cholesky decomposition method can be utilized to do the factorization. Cholesky decomposition is not only
-on average 2 times faster than LU decompoisition method, but also saves about half the memory for storing the matrix. As a result, it is
-highly preferrable to make the conductance SPD, so that cholesky decomoposition method can be utilized. In transient 
-analysis, components as capacitance and inducatance are considered in conductance matrix. Whether the conductance matrix is SPD depends on
-the models used for these two components. 
+\section{Capacitance and Inductance Model for Transient Analysis}
+In transient analysis of power grid, there are resistors, capacitances and inductances. For capacitances and inductances, equivalent linear models must be applied. There are three equivalent linear models for these two devices: Forward Euler (FE), Backward Euler (BE), and Trapezoidal model (TR). Utilizing different equivalent linear models affects the symmetrical potitive definite (SPD) characteristic of the system conductance matrix, which will decides whether the matrix can be decomposed by Cholesky method or LU. Cholesky decomposition is not only on average 2 times faster than LU decompoisition method, but also saves about half the memory for storing the matrix. As a result, it is
+highly preferable to implement the right linear model for the capacitance and inductance to make the conductance matrix SPD, so that cholesky decomposition method can be utilized. 
 \begin{figure*}[htbp]
   \centering
   \includegraphics[width = 0.8\textwidth]{TR_model_new.pdf}
@@ -12,32 +8,27 @@ the models used for these two components.
   \label{TR_model}
 \end{figure*}
 
-Figure~\ref{TR_model} shows the two components and their three models. There are two representations of BE and TR: Norton and Trevin form, as shown 
-in Figure~\ref{TR_model}. In FE model or Thevenion form of BE and TR models, an equivalent voltage source is introduced for at least one component. 
+Figure~\ref{TR_model} shows the two components and their equivalent linear models. There are two representations of BE and TR: Norton and Thevenin form. In FE model or Thevenin form of BE and TR models, an equivalent voltage source is introduced for at least one component. 
 With any of these models, the conductance matrix is not SPD. This can be proved as follows: 
 
-Suppose there is a voltage source between node $i$ and node $j$. The matrix before stamping the voltage source has dimension of $nxn$. 
-After stamping this voltage source, the new matrix is shown as follows:
+Suppose there is a voltage source between node $i$ and node $j$. System conductance matrix before stamping the voltage source has dimension of $n\times n$. After stamping this voltage source, the new matrix is shown as follows:
 \begin{figure}[htbp]
  \centering
  \includegraphics[width=0.3\textwidth]{SPD_matrix_new.pdf}
- \caption{Conductance matrix after stamping companion model}
+ \caption{Conductance matrix after utilizing companion model}
  \label{SPD_matrix}
 \end{figure} 
-%use equations to prove that the BE or FE modeled matrix is not SPD%
+%% use equations to prove that the BE or FE modeled matrix is not SPD%
 
 On the other hand, using the Norton form of TR or BE companion models for both capacitors and inductances will not introduce any 
 voltage source. The introduced components are resistors and currents, which will not effect the SPD characteristic of conductance matrix. 
  
-Besides, FE and BE model will change the effective number of nodes in power grid. As a result, the matrix sizes for DC and transient analysis are different. All the nodes have new indexes, and not any information of old matrix can be reused to form the new matrix. In fact, as 
-the amount of capacitance and inductance only occupys a small ratio of the grid, and most of the nets
+Besides, FE and Thevenin form of BE and TR model will change the effective number of nodes in power grid. As a result, the matrix sizes for DC and transient analysis are different. All the nodes have new indexes, and not any information of old matrix can be reused to form the new matrix. In fact, as the amount of capacitance and inductance only occupys a small ratio of the grid, and most of the nets
 information forming the matrix are identical between DC analysis and transient analysis, it is highly preferable to get the new matrix by
 only modifying capacitance and inductance nets. By using Norton form of TR or BE companion model of inductance and capacitance, no extra 
-node 
-will be introduced into the grid. All the nodes keeps their indices unchanged. As a result, the new matrix can be gained by only stamping
-the capacitance and inductance equivalent components and doing a little modification to the old items of the original matrix. With this
-model, the setting up work is much more easier and time saving, which is especially true for large size of power grids. Considering that 
-Trapezoidal integration is in general more accurate than either FE or BE\cite{ECE552}, TR model is considered in this paper.
+node will be introduced into the grid. The new matrix can be gained by only stamping
+the capacitance and inductance equivalent components and doing a little modification to the old items of the original matrix. The setting up work is needs much less effort, which is especially true for large size of power grids. Considering that 
+Trapezoidal integration is in general more accurate than either FE or BE\cite{ECE552}, TR model is utilized as the equivalent linear model for capacitance and inductance in this paper.
 
 Based on the above consideration, TR companion models of capacitors and inductances in Norton form are utilized in this paper. The 
-resulting matrix is SPD, and will be decomposed with cholesky method.
+resulting matrix is SPD, and can be decomposed with Cholesky method.

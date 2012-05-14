@@ -22,16 +22,15 @@ to pipeline technique. Iterations are overlapped together to reduce the simulati
 solver for transient analysis, the larger $N$ means the iteration method itself is more slower than the direct solver. Besides, with this method, the maximum speed up is $\frac{T\times N}{(T+N)} \approx N$, which happens for small $N$. Limited amount of speed up over the sequential version may be arrived, while the iterative sequential solver is slower than the direct solver. It is not clear that this method can bring speedup to transient analysis for power grid. 
 At the same time, in each iteration, this method requires a large amount of data communication to update the solution of nodes. Considering the two factors mentioned above, this method is also not suitable for transient power grid analysis. 
 
-As a result, new method needs to be developed to speed up the transient analysis. This paper proposes an efficient parallel solver for 
-power grid transient analysis. For the reason mentioned above, the solver is direct solver based. After factorization of global conductance
-matrix, one forward and backward substitution is performed in each time step. Several methods are developed to speedup the sequential code, for example, sparse vector technique and solution-mapping technique. Multi threads are utilized to work on independent pieces of power 
-grids, which effectively introduces speedup. The main contributions are as follows:
+This paper proposes an efficient parallel solver for power grid transient analysis: PGT\_SOLVER. The solver is based on direct solver. After factorizing global conductance matrix, one forward and backward substitution is performed in each time step. Several methods are developed 
+to speedup the program, for example, sparse vector technique, smart mapping technique, and supernode technique. Multi threads are utilized to work on independent components of power grid, which effectively introduces speedup. The main contributions are as follows:
   \begin{enumerate}[1)]
-  \item Trapezoidal model of capacitance and inductance is utilized to make the conductance matrix symmetric, thus saves both factorization
-	time and storage space.
-  \item Techniques such as sparse vector and solution-mapping are developed to accelerate the sequential simulation.
-  \item Multiple threads are utilized to work on independent components of power grids, which is very effective in speed up the 
-	simulation.
+  \item Trapezoidal model of capacitance and inductance is utilized to generate a symmetric positive definite conductance, which is then decomposed with Cholesky method, thus saves both time and storage space for factorization.
+  \item Sparse vector technique is utilized to avoid solving all the nodes in the power grid.
+  \item Smart mapping technique is proposed to locate the corresponding node index before and after reordering introduced in matrix 		decomposition stage.
+  \item Supernode technique is utilized to accelerate the solving process.
+  \item Multiple threads are utilized to work on independent components of power grid to introduce parallel and speedup the simulation process.
+  \item The proposed software won first prize of TAU\_2012. Experimental results on several industrial benchmarks shows that this software can fast perform transient analysis of power grid without losing any accuracy. 
   \end{enumerate} 
 
 The rest of this paper is organized as follows. Section 2 discusses models of transient analysis. Section 3 presents the proposed method. 
