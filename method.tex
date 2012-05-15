@@ -82,22 +82,25 @@ where $A'=LL'$ is the decomposed matrix without reordering, and $b'$ is the righ
 By performing the above operations, we successfully eliminate the reordering operation along the time steps.
 %In Experiment result, need a table to show the time savings with the reordering technique% 
 
-  \subsection{Memory Supernode Solving}
+  \subsection{Memorized Supernode Solving}
 %find and cite some papers about supernode technique, a brief introduction of supernode solving%
 %need to talk about regular supernode solving process: judgement is required to be performed in each time step%
-In this paper, a modified supernode technique named ``Memory Supernode Solving" is proposed for efficient transient simulation. After 
-factorizing the conductance matrix, the number of columns contained in each supernode is gained by judging the characteristic among 
-neighboring columns. This information is stored in an array. Then, in each time step, corresponding functions for different type of 
-supernode are directly called by getting data from the stored array. No complex judgement is required. This is effective for transient
-analysis, in which multi step computation is required.  
+In this paper, a modified supernode technique named ``Memorized Supernode Solving" is proposed for efficient transient simulation. After 
+factorizing the conductance matrix, the number of columns contained in each supernode is obtained by the characteristic among 
+neighboring columns. To avoid searching process for supernode in later time steps, we create an array to memorize information for supernode. In each time step, corresponding functions for different type of 
+supernode are directly called by data from the memorizing array. This operation saves the effort for searching solving method for supernode, and is effective for transient analysis.  
 %In experiment result, need a table to show the time savings with Memorized supernode solving technique%
-  \subsection{Optimized Current Restamping}
-In transient analysis, current varies among different time steps. Because of this change, vector $b$ in equation $AX=b$ needs to be 
-modified at different time steps. It should be noticed that part of the currents stay static for a period. We do not need to modify
-the items that correspond to these current sources. Instead, in each time step, we will locate those current sources whose value are
+
+  \subsection{Optimized Current Re-stamping}
+In transient analysis, current values of different nodes varies among different time steps. Because of this change, vector $b$ in equation $AX=b$ needs to be modified at different time steps. However, part of the current values stay static for a period. We do not need to modify
+items of $b$ that correspond to these current values. Instead, in each time step, we locate those current sources whose value are
 different from last step, and only modify the corresponding items in the right hand side. 
+
   \subsection{Multiple threads}
-There are usually several sub circuits in power grids: VDD, GND and so on. These sub circuits are totally disjoint and can be solved
-in parallel. In this paper, multiple threads are used to parallelize the simulation. One thread handles one sub circuit. The number of
-speed up is almost identical to the number of sub circuits in the power grids.
+In fact, we also tried to use multiple threads to solve single component, especially for BE and FE solving stage and matrix decomposition stage. First, for the BE and FE solving stage, since the solving time for each time step is very fast, with is less than 1s, it is very hard 
+to beat the solving process with single thread of BE and FE stage. We also tried to parallelize the matrix decomposition process. Only part of the function of matrix decomposition can be parallelized. Moreover, the effect of parallelization of matrix decomposition can only be seen when the conductance matrix is very large in size, so that the function has enough tasks to feed the multiple threads. Since the matrix decomposition only occupies less than 40\% of total simulation time, even there is enough tasks to feed the multiple threads and bring some speedup, the speedup is not significant. In experiment we performed, we only observed less than 20\% decrease in runtime. In fact, because of the ratio of matrix decomposition, the maximum speedup that can be achieved by speedup matrix decomposition is less than 2X.
+
+There are usually several components in power grids: VDD, GND and so on. These components are totally independent and can be solved
+in parallel. Since they are similar in size, we utilize multiple threads to parallelize the simulation. One thread simulates one component. The number of speed up is almost identical to the number of components in the power grids.
+
 %talking about dynamic schedule, and why further speed up can not gained with this stra
