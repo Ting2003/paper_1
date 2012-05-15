@@ -1,11 +1,10 @@
 \section{Methodology}
   \subsection{Sparse Vector}
    %first show the example and cite%
-    There are two stages in solving a linear system: matrix decompisition and forward (FE) and backward (BE) substitution stages. In matrix 
-decomposition,
-, the sparsity of matrix can greatly help reducing computation intensity. In the same way, the sparsity of vectors can also help reducing
-the computation intensity. \cite{Tinney} illustrates the theory of sparse vector methods. Suppose we have a linear system with 20 nodes.
-The conductance matrix has already been decomposed, which is 
+    There are two stages in solving a linear system: matrix decomposition and forward (FE) and backward (BE) substitution. In matrix 
+decomposition stage, the sparsity feature of matrix can greatly help reducing computation intensity. In the same way, the sparsity of 
+vectors can help reducing the computation intensity in the FE and BE substitution stage. \cite{Tinney} illustrates the sparse vector 
+method. Suppose we have a linear system with 20 nodes. The conductance matrix has already been decomposed, which is 
 \begin{equation}
 	A=LL'\label{eq3.1}
 \end{equation}
@@ -15,39 +14,38 @@ Forward and backward substitution are required to obtain the final solution. The
 	L'X &= Y&(BE)\label{eq3.3}
 \end{align}
 
-  %figure 1: elimination tree of A%
-Figure 1.(a) Shows the $L$ of the decomposed matrix $A$ and the corresponding elimination tree. Assuming that only $y_{12}, y_{14}$ is 
-non-zero, and only $x_{10},x_{17}$ is required for finding solution. Then, the items in $Y$ and $X$ that need to be computed can be 
-presented along the following path, which represents their order of computation.
+%figure 1: elimination tree of A%
+Figure 1 Shows the $L$ of the decomposed matrix $A$ and the corresponding elimination tree. Assuming that only $y_{12}, y_{14}$ is 
+non-zero, and only solution of $x_{10}$ and $x_{17}$ are required to be obtained. The items in $Y$ and $X$ that need to be computed can be 
+presented along the order of paths listed as follows:
 \begin{align}
 &\{12, 15, 14, 17, 18, 19, 20\} &(FE)\label{eq3.4}\\
 &\{20, 19, 18, 17, 13, 10\}&(BE)\label{eq3.5}
 \end{align}
 In this paper, we define the above two paths as ``forward path" and ``backward path". By utilizing the sparse characteristic of vectors,
-only 6 or 7 items are needed to compute instead of 20. It can be seen that by utilizing the sparcity characteristic of vectors, a lot of
-savings in FE and BE can be obtained. The amount of savings of computation depends on the number of nodes in the paths, which depends on 
-the matrix structure. 
+only 6 or 7 items are needed to compute instead of 20. It can be seen that by utilizing the sparsity characteristic of vectors, a lot of
+savings in FE and BE substitution process can be obtained. The amount of savings in computation depends on the number of nodes in the 
+paths, which is decided by the structure of decomposed matrix. 
  
-In transient analysis, it can be seen that as long as the right parameter values of capacitor and inductance are gained, it is 
-sufficient to 
-perform the computation of next time step. As a result, the voltage values of neighboring nodes of capacitor and inductance should be 
-known. Besides, there are also tens of observation nodes, whose voltage values need to be known at each time step. The voltage values of
-these two part of nodes are all information we need to get at each time step. Considering that the
-total ratio that the above two parts of nodes occupyies is only a small amount of the total number of nodes in power grid, the equivalent
-vector $X$ is very sparse. On the other hand, $b$ depends on the number of current sources in the grid, which is very small a ratio 
-compared to the total number of nodes. $b$ is very sparse as well. With this sparse characteristic in vector $b$ and $X$, we can build the
-forward and backward paths and save part of the effort in computation. This effort is worthwhile for transient analysis, because by 
-reusing the paths, saving in computation is accumulated as time step goes by.
+There are two parts of nodes' voltage values we need to obtain in each time step. First, in transient analysis, as long as the equivalent parameters of capacitors and inductances are obtained, we can perform 
+simulation of next time step. Considering the equations for equivalent parameters of capacitances and inductances, which is shown in %equations shown the equivalent values for cap and inducs%.
 
-The challenging work is to build the forward and backward paths. \cite{Tinney} provides a path building method, where the first path is 
+As a result, the voltage values of neighboring nodes of capacitor and inductance should be 
+known to obtain $V(t)$ and $i(t)$ from last step. Besides, there are tens nodes listed in the output list of the netlist, whose voltage values change we are interested. The voltage values of
+these two sets of nodes are all information we need to get at each time step. Considering that these two sets of nodes only occupies a
+tiny part of the total number of nodes in power grid, the equivalent
+vector $X$ is very sparse. On the other hand, number of non-zeros in $b$ depends on the number of current sources in the grid, which is 
+very a small ratio of the total number of nodes in the grid. $b$ is very sparse as well. With the sparse vector $b$ and $X$, we can build 
+the forward and backward paths and save a lot of effort in FE and BE substitution process. This effort is worthwhile for transient 
+analysis, because the built paths can be reused along the time steps, thus time saving is accumulated as time step goes by.
+
+The critical task now is to build the forward and backward paths. \cite{Tinney} provides a path building method, where the first path is 
 obtained on the first step. Then, the next path segments will be inserted into the original path as a whole unit. The inserting point is 
 before the cross point of new path segment and original one. The resulting path is shown in equation \eqref{eq3.4} and \eqref{eq3.5}. It
-can be seen that the resulting index of rows/columns in the path is not mononically ascending or descending. This will cause trouble in
+can be seen that the resulting index of rows/columns in the path is not monotone ascending or descending. This will cause trouble in
 later substitution stage, because it is not possible to finish traversing the path with a single for loop. In order to reduce the 
-complexity, the indexes in the path have to be mononically ascending in FF and mononically descending in BF. Another more serious problem
-is that this method can not detect the case where a node does not have any decedent in the elimination tree, such as column $5$ in figure 
-1. Because diagonal element does not have any decedent element, no insertion point can be find with the above method. As a result, the 
-path is showing incomplete information, and will lead to wrong solution. 
+complexity, the indexes in the path have to be in monotone ascending order in FF and in monotone descending order in BF. Another more 
+serious problem is that this method can not detect the case where a node does not have any decedent in the elimination tree, such as column $5$ in figure 1. Because diagonal element does not have any decedent element, no insertion point can be find with the above method. As a result, the built path is incomplete, and will lead to wrong results. 
 
 In order to overcome the above limitations, a new method is proposed in this paper. It is illustrated in Figure 2.
 %Figure 2: showing the algorithms of path building method%
