@@ -51,39 +51,37 @@ In order to overcome the above limitations, a new method is proposed in this pap
 %Figure 2: showing the algorithms of path building method%
 After building the first path, the next segment start from the node with minimum index and will stop under two cases: 
 \begin{enumerate}[1)]
-\item Current node has a descedent and the descedent node is already in the formed path; 
-\item Current node has no descedent.
+\item Current node has a descendent and the descendent node is already in the formed path; 
+\item Current node has no descendent.
 \end{enumerate} 
-By considering the second case, the node that has no descedent is included to form the path. We build a list to record all the nodes in 
-the segments. To make the later substitution stage being finished in a for loop, we sorted the nodes in the list. The sorted list are then
-inserted into the original path obtained from first step. Since the nodes in the list are in asceding order, so does the original path, 
-the searching and insertion will start from the position that the last node is inserted, instead of the head of the path. The cost for
-insertion is $O(n)$, where $n$ is the number of nodes in the matrix. Notice that we will only sort an array with length of the list, 
-instead of all the nodes in the matrix. If the first path is very long, we only need to sort a short array, which reduces a lot of effort.
+The second step insures node that has no descendent is inserted in the path. We build a list to record all the nodes in 
+the segments. To make the later substitution stage being finished in a single traversing, we sorted the nodes in the list. The sorted list are then inserted into the original path obtained from first step. Since the nodes in the list are in monotone ascending or descending order, which is in accordance with the original path, the searching and insertion point starts from the position that the last node is inserted, instead of the head of the path. The cost for the total searching and insertion operations is $O(n)$, where $n$ is the number of nodes in 
+the matrix. Notice that we only sort the array with length of the segments instead of all the nodes in the matrix. If the first path is 
+very long, we only need to sort very short array, which reduces a lot of effort.
 %In the experiment result, need a table to show the ratio saved with this technique, and the speed for building the paths% 
 
  \subsection{Solution Mapping}
-In order to reduce fill-ins, reordering is usually taken in matrix decomposition process. The ordering in decomposed 
-matrix and the original one is different. In order to get the right result, corresponding reordering must be performed to the right hand 
-side vector. Regular solving process is as follows:
+In order to reduce fill-ins, reordering is usually utilized in matrix decomposition stage. The ordering of nodes' indexes in decomposed 
+matrix and the original matrix are different. In the FE and BE substitution stage, corresponding reordering must 
+be performed to the right hand side vector to get the right result. Regular solving process is as follows:
 \begin{enumerate}[1)]
-\item Reordering the right hand side vector in the same way of decomposing matrix.
+\item Reordering the right hand side vector in the same pattern as matrix decomposition stage.
 \item Perform forward and backward substitution to get the reordered solution.
-\item Reordering the solution vector back in the inverse way as that of the right hand side.
+\item Reordering the solved vector back in the inverse pattern as that of the right hand side.
 \end{enumerate}
-As we can see, in each time step, 2 reordering operations required to get the right solution. If we utilize the regular solving process in each
-time step, for transient analysis of large power grid, the reordering process may cost a lot of time. It is highly perferable to 
-eliminate the reordering operation. It is possible to realize this idea case: after factorizing the conductance matrix, the mapping 
-relationship between the original and new order of each node is recorded. For each node on power grid, the original index is renewed
-into the new one. Then, the right hand side is restamped based on the new ordering. Through these operations, the right hand side vector is
+As we can see, in each time step, 2 reordering operations are required to get the right solution. If we utilize the regular solving 
+process in each time step, for transient analysis of large power grid, the reordering process may cost a lot of extra time. It is highly preferable to eliminate the reordering operation. In this paper, we propose a smart mapping technique to avoid these reordering operations.
+
+After factorizing the conductance matrix, the index relationship of each node between the original matrix and decomposed matrix is recorded. For each node in power grid, instead of keeping the original index, we renew the index into the new one. We also re-stamp the right hand side based on the new index of nodes. These process is only performed in the first time step for once. The updated indexes will be maintained in the rest of the time steps. Through these operations, the right hand side vector is
 in the same ordering with the decomposed matrix. The equivalent linear system for solving stage is as follows:
 \begin{equation}
 A'x = b'
 \end{equation}
 where $A'=LL'$ is the decomposed matrix without reordering, and $b'$ is the right hand side without reordering.
 
-As a result, the 2 reordering operations are not needed. Only the FE and BE operations are executed for all the time steps.
+By performing the above operations, we successfully eliminate the reordering operation along the time steps.
 %In Experiment result, need a table to show the time savings with the reordering technique% 
+
   \subsection{Memory Supernode Solving}
 %find and cite some papers about supernode technique, a brief introduction of supernode solving%
 %need to talk about regular supernode solving process: judgement is required to be performed in each time step%
