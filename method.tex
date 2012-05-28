@@ -1,6 +1,5 @@
 \section{Methodology}
   \subsection{Sparse Vector}
-   %first show the example and cite%
     There are two stages in solving a linear system: matrix decomposition and forward (FE) and backward (BE) substitution. In matrix 
 decomposition stage, the sparsity feature of matrix can greatly help reducing computation intensity. In the same way, the sparsity of 
 vectors can help reducing the computation intensity in the FE and BE substitution stage. \cite{Tinney} illustrates the sparse vector 
@@ -8,31 +7,47 @@ method. Suppose we have a linear system with 20 nodes. The conductance matrix ha
 \begin{equation}
 	A=LL'\label{eq3.1}
 \end{equation}
+
+Figure~\ref{eli_tree}\subref{subfig.1} Shows the $L$ of the decomposed matrix $A$. We can build the path graph from $L$ by creating an undirected edge between the diagonal element and the first non-zero element in the same column, which is shown in Figure~\ref{eli_tree}\subref{subfig.2}.
+
+\begin{figure}[htbp]
+ \centering
+\subfigure[][Decomposed $L$ of $A$]{
+ 	\includegraphics[width=0.2\textwidth]{L_matrix.pdf}\label{subfig.1}}
+ \subfigure[][path graph]{
+ 	\includegraphics[width=0.25\textwidth]{path_graph.pdf}\label{subfig.2}}
+ \caption{Decomposed matrix and path graph}
+ \subref{subfig.1} Decomposed $L$ of $A$
+ \subref{subfig.2} path graph
+ \label{eli_tree}
+\end{figure}
+
 Forward and backward substitution are required to obtain the final solution. The equations for these two operations are as follows:
 \begin{align}
 	LY &=b  &(FE)\label{eq3.2}\\
 	L'X &= Y&(BE)\label{eq3.3}
 \end{align}
 
-%figure 1: elimination tree of A%
-Figure 1 Shows the $L$ of the decomposed matrix $A$ and the corresponding elimination tree. Assuming that only $y_{12}, y_{14}$ is 
-non-zero, and only solution of $x_{10}$ and $x_{17}$ are required to be obtained. The items in $Y$ and $X$ that need to be computed can be 
-presented along the order of paths listed as follows:
+Assuming that only $y_{12}, y_{14}$ is non-zero, and only solution of $x_{10}$ and $x_{17}$ are required to be obtained. The items in $Y$ and $X$ that need to be computed can be presented along the order of paths listed as follows:
 \begin{align}
 &\{12, 15, 14, 17, 18, 19, 20\} &(FE)\label{eq3.4}\\
 &\{20, 19, 18, 17, 13, 10\}&(BE)\label{eq3.5}
 \end{align}
+
 In this paper, we define the above two paths as ``forward path" and ``backward path". By utilizing the sparse characteristic of vectors,
 only 6 or 7 items are needed to compute instead of 20. It can be seen that by utilizing the sparsity characteristic of vectors, a lot of
-savings in FE and BE substitution process can be obtained. The amount of savings in computation depends on the number of nodes in the 
+savings can be obtained in FE and BE substitution process. The amount of savings in computation depends on the number of nodes in the 
 paths, which is decided by the structure of decomposed matrix. 
  
 There are two parts of nodes' voltage values we need to obtain in each time step. First, in transient analysis, as long as the equivalent parameters of capacitors and inductances are obtained, we can perform 
-simulation of next time step. Considering the equations for equivalent parameters of capacitances and inductances, which is shown in %equations shown the equivalent values for cap and inducs%.
+simulation of next time step. Considering the equations for equivalent parameters of capacitances and inductances, which is shown as follows:
+\begin{align}
+	L: G_{eq}=\frac{\triangle t}{2L}\hspace{5mm} I_{eq}=i(t)+\frac{2Cv(t)}{\triangle t}\\
+	C: G_{eq}=\frac{2C}{\triangle t} \hspace{5mm} I_{eq}=i(t)+\frac{2Cv(t)}{\triangle t}
+\end{align}
 
-As a result, the voltage values of neighboring nodes of capacitor and inductance should be 
-known to obtain $V(t)$ and $i(t)$ from last step. Besides, there are tens nodes listed in the output list of the netlist, whose voltage values change we are interested. The voltage values of
-these two sets of nodes are all information we need to get at each time step. Considering that these two sets of nodes only occupies a
+In order to obtain $v(t)$, voltage values of nodes connecting capacitance and inductance have to be obtained. Besides, in order to get branch current $i(t)$, we also need to know voltage values of neighboring nodes of the end of capacitance and inductance. Meanwhile, there are tens nodes listed in the output list of the netlist, whose voltage values we are interested. The voltage values of
+these the above nodes are all information we need to get at each time step. Considering that these nodes only occupies a
 tiny part of the total number of nodes in power grid, the equivalent
 vector $X$ is very sparse. On the other hand, number of non-zeros in $b$ depends on the number of current sources in the grid, which is 
 very a small ratio of the total number of nodes in the grid. $b$ is very sparse as well. With the sparse vector $b$ and $X$, we can build 
@@ -47,20 +62,42 @@ later substitution stage, because it is not possible to finish traversing the pa
 complexity, the indexes in the path have to be in monotone ascending order in FF and in monotone descending order in BF. Another more 
 serious problem is that this method can not detect the case where a node does not have any decedent in the elimination tree, such as column $5$ in figure 1. Because diagonal element does not have any decedent element, no insertion point can be find with the above method. As a result, the built path is incomplete, and will lead to wrong results. 
 
-In order to overcome the above limitations, a new method is proposed in this paper. It is illustrated in Figure 2.
-%Figure 2: showing the algorithms of path building method%
-After building the first path, the next segment start from the node with minimum index and will stop under two cases: 
+In order to overcome the above limitations, a modified method is proposed in this paper. The algorithm for building forward path is illustrated in Algorithm~\ref{find_path}. Backward path can be established in reverse order.
+\begin{algorithm}[H]
+        \caption{Building forward path}\label{find_path}
+	\begin{algorithmic}
+		\STATE //Build first path segment $S_0$:
+		\STATE Start from $1^{th}$ node of the path graph and add descendent nodes into $S_0$ until current node
+				has no descendent in the path graph.\\
+		\STATE	p=0; $SS = \emptyset$.
+		\FOR {$i=0$ \textbf{to} $N$}
+			\STATE // build a new path segment
+		    \STATE IF $i^{th}$ node has not been visited
+		 		\STATE	p = p+1; $S_{p+1}=\emptyset$;
+				\STATE While $n_i$ has descendent \&\& the descendent node is not been visited 
+					\STATE	$S_{p+1}=S_{p+1}\cup n_i$
+					\STATE	$i=i+1$;
+				\STATE // include this path segment into the global list	
+				\STATE $SS=SS\cup S_{p+1}$.			
+		\ENDFOR 
+		\STATE sort $SS$ in ascending order.
+		\STATE forward\_path $\leftarrow$ insert $n_i\in SS$ into $S_0$.
+	\end{algorithmic}\vspace{10pt}
+\end{algorithm}
+
+The algorithm start with building the first path segment with node of lowest index. Then, we build the next path segments from the node with minimum index. The traversal process stops under two cases: 
 \begin{enumerate}[1)]
 \item Current node has a descendent and the descendent node is already in the formed path; 
 \item Current node has no descendent.
 \end{enumerate} 
-The second step insures node that has no descendent is inserted in the path. We build a list to record all the nodes in 
-the segments. To make the later substitution stage being finished in a single traversing, we sorted the nodes in the list. The sorted list are then inserted into the original path obtained from first step. Since the nodes in the list are in monotone ascending or descending order, which is in accordance with the original path, the searching and insertion point starts from the position that the last node is inserted, instead of the head of the path. The cost for the total searching and insertion operations is $O(n)$, where $n$ is the number of nodes in 
-the matrix. Notice that we only sort the array with length of the segments instead of all the nodes in the matrix. If the first path is 
-very long, we only need to sort very short array, which reduces a lot of effort.
+
+The second stop criteria includes node with no descendent in the path, which is been ignored in \cite{Tinney}. We store all the path segments into a global list, which is $SS$. Nodes in $SS$ are sorted in ascending order to make the later forward substitution stage being finished in a single traversing. The sorted $SS$ is inserted into the original path $S_0$ to form the forward path. Since the nodes in the list are in monotone ascending order, which is in accordance with that in $S_0$, the insertion point starts from the last insertion position instead of the head of the path. The total cost for insertion is $O(N)$, where $N$ is the number of nodes in 
+the matrix. Notice that we only sort the array with length of $SS$ instead of all the nodes in the matrix. If the first path is 
+very long, the length of $SS$ is short, thus a lot of effort is reduced.
 %In the experiment result, need a table to show the ratio saved with this technique, and the speed for building the paths% 
 
  \subsection{Solution Mapping}
+% add a figure showing the reordering and solution mapping process.
 In order to reduce fill-ins, reordering is usually utilized in matrix decomposition stage. The ordering of nodes' indexes in decomposed 
 matrix and the original matrix are different. In the FE and BE substitution stage, corresponding reordering must 
 be performed to the right hand side vector to get the right result. Regular solving process is as follows:
@@ -103,4 +140,4 @@ to beat the solving process with single thread of BE and FE stage. We also tried
 There are usually several components in power grids: VDD, GND and so on. These components are totally independent and can be solved
 in parallel. Since they are similar in size, we utilize multiple threads to parallelize the simulation. One thread simulates one component. The number of speed up is almost identical to the number of components in the power grids.
 
-%talking about dynamic schedule, and why further speed up can not gained with this stra
+%talking about dynamic schedule, and why further speed up can not gained with this strategy

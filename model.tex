@@ -11,18 +11,57 @@ highly preferable to implement the right linear model for the capacitance and in
 Figure~\ref{TR_model} shows the two components and their equivalent linear models. There are two representations of BE and TR: Norton and Thevenin form. In FE model or Thevenin form of BE and TR models, an equivalent voltage source is introduced for at least one component. 
 With any of these models, the conductance matrix is not SPD. This can be proved as follows: 
 
-Suppose there is a voltage source between node $i$ and node $j$. System conductance matrix before stamping the voltage source has dimension of $n\times n$. After stamping this voltage source, the new matrix is shown as follows:
+%% show that matrix with Norton form of BE and TR is SPD.
+
+Suppose there is a voltage source between node $i$ and node $j$. System conductance matrix before stamping the voltage source has dimension of $n\times n$. After stamping this voltage source, the new matrix is shown as Figure~\ref{SPD_matrix_modify}\subref{subfig.2}.
+
 \begin{figure}[htbp]
  \centering
- \includegraphics[width=0.3\textwidth]{SPD_matrix_new.pdf}
- \caption{Conductance matrix after utilizing companion model}
- \label{SPD_matrix}
-\end{figure} 
-%% use equations to prove that the BE or FE modeled matrix is not SPD%
+\subfigure[][Conductance matrix with Norton form of BE and TR model]{
+ 	\includegraphics[width=0.25\textwidth]{matrix_spd.pdf}\label{subfig.1}}
+ \subfigure[][Conductance matrix with FE and Thevenin form of BE and TR model]{
+ 	\includegraphics[width=0.25\textwidth]{matrix_non_spd.pdf}\label{subfig.2}}
+ \caption{Conductance matrix with companion models}
+ \subref{subfig.1} A with Norton form of BE and TR model
+ \subref{subfig.2} A with FE and Thevenin form of BE and TR model
+ \label{SPD_matrix_modify}
+\end{figure}
+
+The equations for $i^{th}$ and $j^{th}$ node are as follows:
+\begin{align}
+	a_{ii}x_i+\sum\limits_{k\neq j}a_{ik}x_k &= b_i\\
+	a_{jj}x_j+\sum\limits_{k\neq i}a_{jk}x_k+a_{ji}x_i&=b_j \label{v_express}
+\end{align}
+
+With the constraint of voltage source between node $i$ and $j$, we have
+\begin{equation}
+	x_i-x_j=1 \label{v_con}
+\end{equation}
+The added row of voltage constraints in conductance matrix decides that the conductance matrix is not SPD, because one condition for a matrix 
+to be SPD is that $a_{ii}>0, i=1,\dots, n$. With the voltage constraints, the diagonal is 0, thus the matrix is not SPD.
 
 On the other hand, using the Norton form of TR or BE companion models for both capacitors and inductances will not introduce any 
-voltage source. The introduced components are resistors and currents, which will not effect the SPD characteristic of conductance matrix. 
+voltage source. The introduced components are resistors and currents, which will not effect the SPD characteristic of conductance matrix. This can be illustrated as follows:
+
+The equations for $i^{th}$ and $j^{th}$ node are as follows:
+\begin{align}
+	a_{ii}x_i+\sum\limits_{k}a_{ik}x_k &= 0\\
+	a_{jj}x_j+\sum\limits_{k\neq i}a_{jk}x_k+a_{ji}x_i&=b_j
+\end{align}
+
+With the constraint of voltage source between node $i$ and $j$, we have
+\begin{equation}
+	x_i=1
+\end{equation} 
+
+The above three equations can be modified into:
+\begin{align}
+	x_i=1\\
+	a_{jj}x_j+\sum\limits_{k\neq i}a_{jk}x_k&=b_j-a_{ji} \label{v_express_prime}
+\end{align}
  
+As a result, the new conductance matrix is shown in Figure~\ref{SPD_matrix_modify}\subref{subfig.1}.
+
 Besides, FE and Thevenin form of BE and TR model will change the effective number of nodes in power grid. As a result, the matrix sizes for DC and transient analysis are different. All the nodes have new indexes, and not any information of old matrix can be reused to form the new matrix. In fact, as the amount of capacitance and inductance only occupys a small ratio of the grid, and most of the nets
 information forming the matrix are identical between DC analysis and transient analysis, it is highly preferable to get the new matrix by
 only modifying capacitance and inductance nets. By using Norton form of TR or BE companion model of inductance and capacitance, no extra 
