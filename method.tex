@@ -13,9 +13,9 @@ Figure~\ref{eli_tree}\subref{subfig.1} Shows the $L$ of the decomposed matrix $A
 \begin{figure}[htbp]
  \centering
 \subfigure[][Decomposed $L$ of $A$]{
- 	\includegraphics[width=0.2\textwidth]{L_matrix.pdf}\label{subfig.1}}
+ 	\includegraphics[width=0.3\textwidth]{L_matrix.pdf}\label{subfig.1}}
  \subfigure[][path graph]{
- 	\includegraphics[width=0.25\textwidth]{path_graph.pdf}\label{subfig.2}}
+ 	\includegraphics[width=0.3\textwidth]{path_graph.pdf}\label{subfig.2}}
  \caption{Decomposed matrix and path graph}
  \subref{subfig.1} Decomposed $L$ of $A$
  \subref{subfig.2} path graph
@@ -94,10 +94,8 @@ The algorithm start with building the first path segment with node of lowest ind
 The second stop criteria includes node with no descendent in the path, which is been ignored in \cite{Tinney}. We store all the path segments into a global list, which is $SS$. Nodes in $SS$ are sorted in ascending order to make the later forward substitution stage being finished in a single traversing. The sorted $SS$ is inserted into the original path $S_0$ to form the forward path. Since the nodes in the list are in monotone ascending order, which is in accordance with that in $S_0$, the insertion point starts from the last insertion position instead of the head of the path. The total cost for insertion is $O(N)$, where $N$ is the number of nodes in 
 the matrix. Notice that we only sort the array with length of $SS$ instead of all the nodes in the matrix. If the first path is 
 very long, the length of $SS$ is short, thus a lot of effort is reduced.
-%In the experiment result, need a table to show the ratio saved with this technique, and the speed for building the paths% 
 
  \subsection{Solution Mapping}
-% add a figure showing the reordering and solution mapping process.
 In order to reduce fill-ins, reordering is usually utilized in matrix decomposition stage. The ordering of nodes' indexes in decomposed 
 matrix and the original matrix are different. In the FE and BE substitution stage, corresponding reordering must 
 be performed to the right hand side vector to get the right result. Regular solving process is as follows:
@@ -110,23 +108,24 @@ As we can see, in each time step, 2 reordering operations are required to get th
 process in each time step, for transient analysis of large power grid, the reordering process may cost a lot of extra time. It is highly preferable to eliminate the reordering operation. In this paper, we propose a smart mapping technique to avoid these reordering operations.
 
 After factorizing the conductance matrix, the index relationship of each node between the original matrix and decomposed matrix is recorded. For each node in power grid, instead of keeping the original index, we renew the index into the new one. We also re-stamp the right hand side based on the new index of nodes. These process is only performed in the first time step for once. The updated indexes will be maintained in the rest of the time steps. Through these operations, the right hand side vector is
-in the same ordering with the decomposed matrix. The equivalent linear system for solving stage is as follows:
+in the same ordering with the decomposed matrix. The above process is illustrated in Figure~\ref{reordering}. The equivalent linear system for solving stage is as follows:
 \begin{equation}
 A'x = b'
 \end{equation}
 where $A'=LL'$ is the decomposed matrix without reordering, and $b'$ is the right hand side without reordering.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width = 0.4\textwidth]{reordering.pdf}
+  \caption{Solution mapping process.}
+  \label{reordering}
+\end{figure}
 
 By performing the above operations, we successfully eliminate the reordering operation along the time steps.
-%In Experiment result, need a table to show the time savings with the reordering technique% 
 
   \subsection{Memorized Supernode Solving}
-%find and cite some papers about supernode technique, a brief introduction of supernode solving%
-%need to talk about regular supernode solving process: judgement is required to be performed in each time step%
-In this paper, a modified supernode technique named ``Memorized Supernode Solving" is proposed for efficient transient simulation. After 
-factorizing the conductance matrix, the number of columns contained in each supernode is obtained by the characteristic among 
-neighboring columns. To avoid searching process for supernode in later time steps, we create an array to memorize information for supernode. In each time step, corresponding functions for different type of 
-supernode are directly called by data from the memorizing array. This operation saves the effort for searching solving method for supernode, and is effective for transient analysis.  
-%In experiment result, need a table to show the time savings with Memorized supernode solving technique%
+Supernode technique has been wisely utilized in matrix multiplication. Compared to perform operations on a single column or row, performing operations on supernode makes the memory fetch and store more efficiently\cite{Selberherr}. After decomposition of conductance matrix, supernode can be located, so that forward and backward substitution can be performed on these supernodes. 
+
+For each time step of transient analysis, we have to locate the supernode, which is not necessary if the information of supernode can be recorded. Based on this idea, we propose a modified supernode forward and backward substitution technique named ``Memorized Supernode Solving". The supernode information is memorized after the factorizing process for first time step. We create an array to memorize the starting column and number of columns of each supernode. In later time step,  this information is directly fetched to perform solving process. The memorized supernode technique saves the effort for building up supernode information at each time step, and is effective for transient analysis.  
 
   \subsection{Optimized Current Re-stamping}
 In transient analysis, current values of different nodes varies among different time steps. Because of this change, vector $b$ in equation $AX=b$ needs to be modified at different time steps. However, part of the current values stay static for a period. We do not need to modify
@@ -139,5 +138,3 @@ to beat the solving process with single thread of BE and FE stage. We also tried
 
 There are usually several components in power grids: VDD, GND and so on. These components are totally independent and can be solved
 in parallel. Since they are similar in size, we utilize multiple threads to parallelize the simulation. One thread simulates one component. The number of speed up is almost identical to the number of components in the power grids.
-
-%talking about dynamic schedule, and why further speed up can not gained with this strategy
